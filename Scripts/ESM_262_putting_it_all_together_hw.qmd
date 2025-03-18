@@ -25,6 +25,9 @@ library(tidyverse)
 library(here)
 library(purrr)
 library(ggpubr)
+library(devtools)
+library(roxygen2)
+library(testthat)
 ```
 
 
