@@ -1,0 +1,155 @@
+---
+title: "ESM_262_putting_it_all_together_hw"
+author: "Samantha Mislinski and Sabrina Molina Ramos"
+format: 
+  html: 
+    code-fold: show
+    toc: true
+    number-sections: true
+    embed-resources: true
+    message: false 
+    warning: false
+editor: visual
+theme: lumen
+execute:
+  echo: true
+  message: false
+  warning: false
+---
+
+# Introduction
+
+## Libraries
+```{r}
+library(tidyverse)
+library(here)
+library(purrr)
+library(ggpubr)
+```
+
+
+# Load Function
+
+```{r}
+source("../R/population_function.R")
+```
+
+# Loops
+
+## For Loop Method
+
+```{r}
+# Empty data frame
+for_population_df = data.frame(
+  time = integer(),          
+  population = numeric(),    
+  growth_rate = numeric(),   
+  carrying_capacity = numeric()  
+)
+
+# Initial parameters
+N <- 500      # Initial population
+K <- 1000     # Carrying capacity
+r <- 0.2      # Growth rate
+num_generations <- 50 
+
+# For loop
+for (t in 1:num_generations) {
+  
+  results <- population_growth(N, K, r)
+  
+  
+  for_population_df <- rbind(for_population_df, 
+                         data.frame(time = t, population = N,growth_rate = results$growth_rate, carrying_capacity = K))
+  
+  # Update N for the next generation
+  N <- results$next_population
+} #end of for loop
+
+for_plot_population <- ggplot(for_population_df, aes(x = time, y = population)) + geom_line(color = "blue") +
+  ggtitle("For Loop: Population Over Time") +
+  xlab("Time (Years)") +
+  ylab("Population") +
+  theme_classic()
+
+# Plot for loop method
+for_plot_growth <- ggplot(for_population_df, aes(x = time, y = growth_rate)) +
+  geom_line(color = "forestgreen") +
+  ggtitle("For Loop: Growth Rate Over Time") +
+  xlab("Time (Years)") +
+  ylab("Growth Rate") +
+  theme_classic()
+
+
+```
+
+## Puur Method
+
+```{r}
+# Initial parameters
+N <- 500      # Initial population
+K <- 1000     # Carrying capacity
+r <- 0.2      # Growth rate
+num_generations <- 50 
+
+# Create a tibble with time steps
+time_steps <- tibble(time = 1:num_generations)
+
+# Function to apply in pmap()
+simulate_population <- function(time, N_prev) {
+  results <- population_growth(N_prev, K, r)
+  tibble(time = time, 
+         population = results$next_population, 
+         growth_rate = results$growth_rate, 
+         carrying_capacity = K)
+} 
+
+
+purr_population_df <- reduce(
+  .x = 1:num_generations,  # Time steps
+  .init = tibble(time = 1, population = N, growth_rate = NA_real_, carrying_capacity = K),  
+  .f = function(acc, t) {
+    # Get last population value
+    N_prev <- acc$population[nrow(acc)]
+    # Append new row
+    bind_rows(acc, simulate_population(t, N_prev))
+  }
+) |>
+  slice(-1)  
+
+
+purr_plot_population <- ggplot(purr_population_df, aes(x = time, y = population)) +
+  geom_line(color = "blue") +
+  ggtitle("Pmap Method: Population Over Time") +
+  xlab("Time") +
+  ylab("Population") +
+  theme_classic()
+
+# Plot pmap method: Time vs. Growth Rate
+purr_plot_growth <- ggplot(purr_population_df, aes(x = time, y = growth_rate)) +
+  geom_line(color = "forestgreen") +
+  ggtitle("Pmap Method: Growth Rate Over Time") +
+  xlab("Time") +
+  ylab("Growth Rate") +
+  theme_classic()
+
+```
+
+# Compairing the Two Methods Plot
+
+```{r}
+# put plots side by side
+# to confirm that they look similar
+for_plot <- ggarrange(for_plot_population, for_plot_growth,  nrow=2)
+for_plot
+
+purr_plot <- ggarrange(purr_plot_population, purr_plot_growth,  nrow=2)
+purr_plot
+
+
+final_plot <- ggarrange(for_plot, purr_plot, ncol = 2, common.legend = TRUE, legend = "bottom") 
+
+
+final_plot <- annotate_figure(final_plot, top = text_grob("Comparison of For Loop and Purr Methods", size = 14))
+final_plot
+```
